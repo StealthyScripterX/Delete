@@ -35,7 +35,6 @@ def get_settings(chat_id):
 
 
 def is_real_user(message: Message) -> bool:
-    # anonymous admin / channel / service message protection
     if message.sender_chat:
         return False
     if not message.from_user:
@@ -64,7 +63,7 @@ async def safe_delete(message: Message, delay: int):
 @app.on_message(
     filters.group
     & filters.incoming
-    & ~filters.command()
+    & ~filters.regex(r"^/")
     & ~filters.service_messages
 )
 async def auto_delete_message(_, message: Message):
@@ -81,7 +80,7 @@ async def auto_delete_message(_, message: Message):
 
 # ============ AUTO DELETE COMMANDS ============
 
-@app.on_message(filters.group & filters.incoming & filters.command())
+@app.on_message(filters.group & filters.incoming & filters.regex(r"^/"))
 async def auto_delete_command(_, message: Message):
 
     if not is_real_user(message):
@@ -143,9 +142,9 @@ async def status(client, message: Message):
 
     s = get_settings(message.chat.id)
     reply = await message.reply(
-        f"📊 **Auto Delete Status**\n\n"
-        f"🗑 Messages: `{s['msg_delay']}s`\n"
-        f"⌛ Commands: `{s['cmd_delay']}s`\n"
+        f"📊 Auto Delete Status\n\n"
+        f"🗑 Messages: {s['msg_delay']}s\n"
+        f"⌛ Commands: {s['cmd_delay']}s\n"
         f"📌 Pinned: Safe"
     )
     asyncio.create_task(safe_delete(reply, s["cmd_delay"]))
