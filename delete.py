@@ -41,7 +41,8 @@ async def safe_delete(chat_id, msg_id):
 
 
 # 🔥 AUTO DELETE NORMAL MESSAGES
-@app.on_message(filters.group & filters.incoming & ~filters.command)
+# note: call filters.command() (not filters.command) so ~ works correctly
+@app.on_message(filters.group & filters.incoming & ~filters.command())
 async def auto_delete_msg(_, message: Message):
 
     if message.is_pinned:
@@ -53,7 +54,8 @@ async def auto_delete_msg(_, message: Message):
 
 
 # ⚡ AUTO DELETE COMMANDS
-@app.on_message(filters.group & filters.command)
+# call filters.command() to get a Filter instance matching any command
+@app.on_message(filters.group & filters.command())
 async def auto_delete_cmd(_, message: Message):
 
     settings = get_settings(message.chat.id)
@@ -64,6 +66,12 @@ async def auto_delete_cmd(_, message: Message):
 # 🛠 ADMIN: SET MESSAGE DELAY
 @app.on_message(filters.group & filters.command("setmsgdelay"))
 async def set_msg_delay(client, message: Message):
+
+    if not message.from_user:
+        warn = await message.reply_text("❌ Cannot identify the sender.")
+        await asyncio.sleep(5)
+        await safe_delete(warn.chat.id, warn.id)
+        return
 
     if not await is_admin(client, message.chat.id, message.from_user.id):
         warn = await message.reply_text("❌ Admin only command")
@@ -90,6 +98,12 @@ async def set_msg_delay(client, message: Message):
 @app.on_message(filters.group & filters.command("setcmddelay"))
 async def set_cmd_delay(client, message: Message):
 
+    if not message.from_user:
+        warn = await message.reply_text("❌ Cannot identify the sender.")
+        await asyncio.sleep(5)
+        await safe_delete(warn.chat.id, warn.id)
+        return
+
     if not await is_admin(client, message.chat.id, message.from_user.id):
         warn = await message.reply_text("❌ Admin only command")
         await asyncio.sleep(5)
@@ -114,6 +128,12 @@ async def set_cmd_delay(client, message: Message):
 # 📊 ADMIN: STATUS
 @app.on_message(filters.group & filters.command("status"))
 async def status(client, message: Message):
+
+    if not message.from_user:
+        warn = await message.reply_text("❌ Cannot identify the sender.")
+        await asyncio.sleep(5)
+        await safe_delete(warn.chat.id, warn.id)
+        return
 
     if not await is_admin(client, message.chat.id, message.from_user.id):
         warn = await message.reply_text("❌ Admin only command")
