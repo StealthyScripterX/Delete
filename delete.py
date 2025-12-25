@@ -41,8 +41,8 @@ async def safe_delete(chat_id, msg_id):
 
 
 # 🔥 AUTO DELETE NORMAL MESSAGES
-# note: call filters.command() (not filters.command) so ~ works correctly
-@app.on_message(filters.group & filters.incoming & ~filters.command())
+# Use regex to exclude any message that starts with '/' (a command)
+@app.on_message(filters.group & filters.incoming & ~filters.regex(r"^/"))
 async def auto_delete_msg(_, message: Message):
 
     if message.is_pinned:
@@ -54,8 +54,8 @@ async def auto_delete_msg(_, message: Message):
 
 
 # ⚡ AUTO DELETE COMMANDS
-# call filters.command() to get a Filter instance matching any command
-@app.on_message(filters.group & filters.command())
+# Match any message that starts with '/' as a command
+@app.on_message(filters.group & filters.incoming & filters.regex(r"^/"))
 async def auto_delete_cmd(_, message: Message):
 
     settings = get_settings(message.chat.id)
