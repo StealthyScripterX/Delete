@@ -2,16 +2,16 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
-# ============ CONFIG ============
+# ================= CONFIG =================
 
 API_ID = 29478891
 API_HASH = "43feb597594883965998bdad7cabbaca"
 BOT_TOKEN = "8159969687:AAEnd6PhjcpexovxB-iSU9by286Ur1s5ZTY"
 
 DEFAULT_MSG_DELAY = 180   # 3 minutes
-DEFAULT_CMD_DELAY = 120   # 120 seconds
+DEFAULT_CMD_DELAY = 120   # 2 minutes
 
-# ===============================
+# =========================================
 
 app = Client(
     "auto_delete_bot",
@@ -23,7 +23,7 @@ app = Client(
 
 GROUP_SETTINGS = {}
 
-# ============ HELPERS ============
+# ================= HELPERS =================
 
 def get_settings(chat_id):
     if chat_id not in GROUP_SETTINGS:
@@ -35,7 +35,7 @@ def get_settings(chat_id):
 
 
 def is_real_user(message: Message) -> bool:
-    # anonymous admin / channel messages
+    # Anonymous admin / channel message protection
     if message.sender_chat:
         return False
     if not message.from_user:
@@ -59,22 +59,23 @@ async def safe_delete(message: Message, delay: int):
         pass
 
 
-# ============ AUTO DELETE NORMAL MESSAGES ============
+# ================= AUTO DELETE NORMAL MESSAGES =================
 
 @app.on_message(filters.group & filters.incoming)
 async def auto_delete_message(_, message: Message):
 
-    # ignore service messages (join/leave/pin/etc.)
+    # ❌ Ignore service messages (join/leave/pin/etc.)
     if message.service:
         return
 
-    # ignore commands (they start with /)
+    # ❌ Ignore commands (start with /)
     if message.text and message.text.startswith("/"):
         return
 
     if not is_real_user(message):
         return
 
+    # ❌ Ignore pinned messages
     if message.pinned_message:
         return
 
@@ -82,7 +83,7 @@ async def auto_delete_message(_, message: Message):
     asyncio.create_task(safe_delete(message, settings["msg_delay"]))
 
 
-# ============ AUTO DELETE COMMANDS ============
+# ================= AUTO DELETE COMMANDS =================
 
 @app.on_message(filters.group & filters.incoming & filters.command())
 async def auto_delete_command(_, message: Message):
@@ -94,7 +95,7 @@ async def auto_delete_command(_, message: Message):
     asyncio.create_task(safe_delete(message, settings["cmd_delay"]))
 
 
-# ============ ADMIN COMMANDS ============
+# ================= ADMIN COMMANDS =================
 
 @app.on_message(filters.group & filters.command("setmsgdelay"))
 async def set_msg_delay(client, message: Message):
@@ -154,8 +155,8 @@ async def status(client, message: Message):
     asyncio.create_task(safe_delete(reply, s["cmd_delay"]))
 
 
-# ============ START BOT ============
+# ================= START =================
 
 if __name__ == "__main__":
-    print("🤖 Auto Delete Bot Running...")
+    print("🤖 Auto Delete Bot Running (Pyrogram 2.0.106)...")
     app.run()
