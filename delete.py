@@ -3,8 +3,8 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 
 API_ID = 29478891
-API_HASH = "REGENERATE_API_HASH"
-BOT_TOKEN = "REGENERATE_BOT_TOKEN"
+API_HASH = "43feb597594883965998bdad7cabbaca"
+BOT_TOKEN = "8159969687:AAEnd6PhjcpexovxB-iSU9by286Ur1s5ZTY"
 
 app = Client("auto_delete_bot", API_ID, API_HASH, bot_token=BOT_TOKEN)
 
