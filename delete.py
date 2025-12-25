@@ -2,17 +2,28 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
+# ================== CONFIG ==================
+
 API_ID = 29478891
 API_HASH = "43feb597594883965998bdad7cabbaca"
 BOT_TOKEN = "8159969687:AAEnd6PhjcpexovxB-iSU9by286Ur1s5ZTY"
 
-app = Client("auto_delete_bot", API_ID, API_HASH, bot_token=BOT_TOKEN)
+DEFAULT_MSG_DELAY = 180   # 3 minutes
+DEFAULT_CMD_DELAY = 120   # 120 seconds
 
-DEFAULT_MSG_DELAY = 180
-DEFAULT_CMD_DELAY = 120
+# ===========================================
+
+app = Client(
+    "auto_delete_bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN,
+    workers=1
+)
 
 GROUP_SETTINGS = {}
 
+# ================== HELPERS ==================
 
 def get_settings(chat_id):
     if chat_id not in GROUP_SETTINGS:
@@ -31,178 +42,110 @@ async def is_admin(client, chat_id, user_id):
         return False
 
 
-async def safe_delete(chat_id, msg_id):
+async def safe_delete(message: Message, delay: int):
     try:
-        await app.delete_messages(chat_id, msg_id)
+        await asyncio.sleep(delay)
+        await message.delete()
     except:
         pass
 
 
-# 🔥 NORMAL MESSAGES (NOT COMMAND, NOT SERVICE)
-@app.on_message(
-    filters.group
-    & filters.incoming
-    & ~filters.regex(r"^/")
-    & ~filters.service
-)
-async def auto_delete_msg(_, message: Message):
+def is_real_user(message: Message) -> bool:
+    if message.sender_chat:
+        return False
+    if not message.from_user:
+        return False
+    return True
+
+# ================== AUTO DELETE MSG ==================
+
+@app.on_message(filters.group & filters.incoming & ~filters.command & ~filters.service)
+async def auto_delete_message(_, message: Message):
+
+    if not is_real_user(message):
+        return
+
+    if message.pinned_message:
+        return
+
     settings = get_settings(message.chat.id)
-    await asyncio.sleep(settings["msg_delay"])
-    await safe_delete(message.chat.id, message.id)
+    asyncio.create_task(safe_delete(message, settings["msg_delay"]))
 
 
-# ⚡ COMMANDS
-@app.on_message(filters.group & filters.incoming & filters.regex(r"^/"))
-async def auto_delete_cmd(_, message: Message):
+# ================== AUTO DELETE COMMAND ==================
+
+@app.on_message(filters.group & filters.incoming & filters.command)
+async def auto_delete_command(_, message: Message):
+
+    if not is_real_user(message):
+        return
+
     settings = get_settings(message.chat.id)
-    await asyncio.sleep(settings["cmd_delay"])
-    await safe_delete(message.chat.id, message.id)
+    asyncio.create_task(safe_delete(message, settings["cmd_delay"]))
 
 
-# 📌 PIN SERVICE MESSAGE → IGNORE
-@app.on_message(filters.group & filters.service & filters.pinned_message)
-async def pinned_event(_, message: Message):
-    return
+# ================== ADMIN COMMANDS ==================
 
-
-# 🛠 ADMIN: SET MESSAGE DELAY
 @app.on_message(filters.group & filters.command("setmsgdelay"))
 async def set_msg_delay(client, message: Message):
 
-    if not message.from_user or not await is_admin(client, message.chat.id, message.from_user.id):
-        warn = await message.reply_text("❌ Admin only command")
-        await asyncio.sleep(5)
-        await safe_delete(warn.chat.id, warn.id)
+    if not is_real_user(message) or not await is_admin(client, message.chat.id, message.from_user.id):
+        warn = await message.reply("❌ Admin only command")
+        asyncio.create_task(safe_delete(warn, 5))
         return
 
     if len(message.command) != 2 or not message.command[1].isdigit():
-        reply = await message.reply_text("Usage: /setmsgdelay <seconds>")
-        await asyncio.sleep(10)
-        await safe_delete(reply.chat.id, reply.id)
+        reply = await message.reply("Usage: /setmsgdelay <seconds>")
+        asyncio.create_task(safe_delete(reply, 10))
         return
 
     delay = int(message.command[1])
     get_settings(message.chat.id)["msg_delay"] = delay
 
-    reply = await message.reply_text(f"✅ Message delete delay set to {delay}s")
-    await asyncio.sleep(DEFAULT_CMD_DELAY)
-    await safe_delete(reply.chat.id, reply.id)
+    reply = await message.reply(f"✅ Message delete delay set to {delay}s")
+    asyncio.create_task(safe_delete(reply, DEFAULT_CMD_DELAY))
 
 
-# 🛠 ADMIN: SET COMMAND DELAY
 @app.on_message(filters.group & filters.command("setcmddelay"))
 async def set_cmd_delay(client, message: Message):
 
-    if not message.from_user or not await is_admin(client, message.chat.id, message.from_user.id):
-        warn = await message.reply_text("❌ Admin only command")
-        await asyncio.sleep(5)
-        await safe_delete(warn.chat.id, warn.id)
+    if not is_real_user(message) or not await is_admin(client, message.chat.id, message.from_user.id):
+        warn = await message.reply("❌ Admin only command")
+        asyncio.create_task(safe_delete(warn, 5))
         return
 
     if len(message.command) != 2 or not message.command[1].isdigit():
-        reply = await message.reply_text("Usage: /setcmddelay <seconds>")
-        await asyncio.sleep(10)
-        await safe_delete(reply.chat.id, reply.id)
+        reply = await message.reply("Usage: /setcmddelay <seconds>")
+        asyncio.create_task(safe_delete(reply, 10))
         return
 
     delay = int(message.command[1])
     get_settings(message.chat.id)["cmd_delay"] = delay
 
-    reply = await message.reply_text(f"✅ Command delete delay set to {delay}s")
-    await asyncio.sleep(delay)
-    await safe_delete(reply.chat.id, reply.id)
+    reply = await message.reply(f"✅ Command delete delay set to {delay}s")
+    asyncio.create_task(safe_delete(reply, delay))
 
 
-# 📊 ADMIN: STATUS
 @app.on_message(filters.group & filters.command("status"))
 async def status(client, message: Message):
 
-    if not message.from_user or not await is_admin(client, message.chat.id, message.from_user.id):
-        warn = await message.reply_text("❌ Admin only command")
-        await asyncio.sleep(5)
-        await safe_delete(warn.chat.id, warn.id)
+    if not is_real_user(message) or not await is_admin(client, message.chat.id, message.from_user.id):
+        warn = await message.reply("❌ Admin only command")
+        asyncio.create_task(safe_delete(warn, 5))
         return
 
     s = get_settings(message.chat.id)
-    reply = await message.reply_text(
+    reply = await message.reply(
         f"📊 Auto Delete Status\n\n"
         f"🗑 Messages: {s['msg_delay']}s\n"
         f"⌛ Commands: {s['cmd_delay']}s\n"
         f"📌 Pinned: Safe"
     )
-    await asyncio.sleep(s["cmd_delay"])
-    await safe_delete(reply.chat.id, reply.id)
+    asyncio.create_task(safe_delete(reply, s["cmd_delay"]))
 
+
+# ================== START ==================
 
 if __name__ == "__main__":
-    app.run()        return
-
-    delay = int(message.command[1])
-    settings = get_settings(message.chat.id)
-    settings["msg_delay"] = delay
-
-    reply = await message.reply_text(f"✅ Message delete delay set to {delay}s")
-    await asyncio.sleep(settings["cmd_delay"])
-    await safe_delete(reply.chat.id, reply.id)
-
-
-# 🛠 ADMIN: SET COMMAND DELAY
-@app.on_message(filters.group & filters.command("setcmddelay"))
-async def set_cmd_delay(client, message: Message):
-
-    if not message.from_user:
-        warn = await message.reply_text("❌ Cannot identify the sender.")
-        await asyncio.sleep(5)
-        await safe_delete(warn.chat.id, warn.id)
-        return
-
-    if not await is_admin(client, message.chat.id, message.from_user.id):
-        warn = await message.reply_text("❌ Admin only command")
-        await asyncio.sleep(5)
-        await safe_delete(warn.chat.id, warn.id)
-        return
-
-    if len(message.command) != 2 or not message.command[1].isdigit():
-        reply = await message.reply_text("Usage: /setcmddelay <seconds>")
-        await asyncio.sleep(10)
-        await safe_delete(reply.chat.id, reply.id)
-        return
-
-    delay = int(message.command[1])
-    settings = get_settings(message.chat.id)
-    settings["cmd_delay"] = delay
-
-    reply = await message.reply_text(f"✅ Command delete delay set to {delay}s")
-    await asyncio.sleep(settings["cmd_delay"])
-    await safe_delete(reply.chat.id, reply.id)
-
-
-# 📊 ADMIN: STATUS
-@app.on_message(filters.group & filters.command("status"))
-async def status(client, message: Message):
-
-    if not message.from_user:
-        warn = await message.reply_text("❌ Cannot identify the sender.")
-        await asyncio.sleep(5)
-        await safe_delete(warn.chat.id, warn.id)
-        return
-
-    if not await is_admin(client, message.chat.id, message.from_user.id):
-        warn = await message.reply_text("❌ Admin only command")
-        await asyncio.sleep(5)
-        await safe_delete(warn.chat.id, warn.id)
-        return
-
-    settings = get_settings(message.chat.id)
-    reply = await message.reply_text(
-        f"📊 **Auto Delete Status**\n\n"
-        f"🗑 Messages: `{settings['msg_delay']}s`\n"
-        f"⌛ Commands: `{settings['cmd_delay']}s`\n"
-        f"📌 Pinned: Safe"
-    )
-
-    await asyncio.sleep(settings["cmd_delay"])
-    await safe_delete(reply.chat.id, reply.id)
-
-
-app.run()
+    print("🤖 Auto Delete Bot Running...")
+    app.run()
