@@ -35,6 +35,7 @@ def get_settings(chat_id):
 
 
 def is_real_user(message: Message) -> bool:
+    # anonymous admin / channel messages
     if message.sender_chat:
         return False
     if not message.from_user:
@@ -60,13 +61,16 @@ async def safe_delete(message: Message, delay: int):
 
 # ============ AUTO DELETE NORMAL MESSAGES ============
 
-@app.on_message(
-    filters.group
-    & filters.incoming
-    & ~filters.regex(r"^/")
-    & ~filters.service_messages
-)
+@app.on_message(filters.group & filters.incoming)
 async def auto_delete_message(_, message: Message):
+
+    # ignore service messages (join/leave/pin/etc.)
+    if message.service:
+        return
+
+    # ignore commands (they start with /)
+    if message.text and message.text.startswith("/"):
+        return
 
     if not is_real_user(message):
         return
@@ -80,7 +84,7 @@ async def auto_delete_message(_, message: Message):
 
 # ============ AUTO DELETE COMMANDS ============
 
-@app.on_message(filters.group & filters.incoming & filters.regex(r"^/"))
+@app.on_message(filters.group & filters.incoming & filters.command())
 async def auto_delete_command(_, message: Message):
 
     if not is_real_user(message):
